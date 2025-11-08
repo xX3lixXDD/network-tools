@@ -1,0 +1,124 @@
+@echo off
+title Network Tools - IP Manager
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+  echo This script requires administrator privileges... Restarting as administrator.
+  powershell -Command "Start-Process -FilePath '%~f0' -Verb runAs"
+  exit /b
+)
+
+:menu
+cls
+echo ================================
+echo       Network Tools - IP Manager
+echo ================================
+echo 1) Release & Renew (DHCP)
+echo 2) Flush DNS
+echo 3) Reset TCP/IP & Winsock
+echo 4) Set Static IP
+echo 5) Set Interface to DHCP
+echo 6) Set DNS
+echo 7) Show Local Network Info (ipconfig /all)
+echo 8) Show Public IP via OpenDNS (nslookup)
+echo 9) Configure WinHTTP Proxy (set/reset)
+echo 0) Exit
+echo ================================
+set /p choice=Enter your choice and press Enter: 
+
+if "%choice%"=="1" goto release_renew
+if "%choice%"=="2" goto flush_dns
+if "%choice%"=="3" goto reset_net
+if "%choice%"=="4" goto set_static
+if "%choice%"=="5" goto set_dhcp
+if "%choice%"=="6" goto set_dns
+if "%choice%"=="7" goto show_info
+if "%choice%"=="8" goto show_public
+if "%choice%"=="9" goto proxy_conf
+if "%choice%"=="0" goto eof
+echo Invalid choice. Press any key to return...
+pause >nul
+goto menu
+
+:release_renew
+echo.
+ipconfig /release
+timeout /t 2 >nul
+ipconfig /renew
+pause
+goto menu
+
+:flush_dns
+echo.
+ipconfig /flushdns
+pause
+goto menu
+
+:reset_net
+echo.
+netsh int ip reset reset_log.txt
+netsh winsock reset
+echo Reset completed. You may need to restart your computer.
+pause
+goto menu
+
+:set_static
+echo.
+set /p IfName=Enter interface name (Wi-Fi or Ethernet): 
+set /p NewIP=Enter new IP (e.g., 192.168.1.50): 
+set /p Mask=Enter Subnet Mask (e.g., 255.255.255.0): 
+set /p Gateway=Enter Gateway (e.g., 192.168.1.1, leave blank if none): 
+if "%Gateway%"=="" (
+  netsh interface ip set address name="%IfName%" static %NewIP% %Mask%
+) else (
+  netsh interface ip set address name="%IfName%" static %NewIP% %Mask% %Gateway%
+)
+pause
+goto menu
+
+:set_dhcp
+echo.
+set /p IfName=Enter interface name: 
+netsh interface ip set address name="%IfName%" source=dhcp
+netsh interface ip set dns name="%IfName%" source=dhcp
+pause
+goto menu
+
+:set_dns
+echo.
+set /p IfName=Enter interface name: 
+set /p DNS1=Enter primary DNS (e.g., 8.8.8.8): 
+netsh interface ip set dns name="%IfName%" static %DNS1% validate=no
+set /p addmore=Add secondary DNS? (y/n): 
+if /i "%addmore%"=="y" (
+  set /p DNS2=Enter secondary DNS: 
+  netsh interface ip add dns name="%IfName%" %DNS2% index=2
+)
+pause
+goto menu
+
+:show_info
+ipconfig /all
+pause
+goto menu
+
+:show_public
+nslookup myip.opendns.com resolver1.opendns.com
+pause
+goto menu
+
+:proxy_conf
+echo.
+echo 1) Set WinHTTP Proxy
+echo 2) Reset WinHTTP Proxy
+set /p pchoice=Choose 1 or 2: 
+if "%pchoice%"=="1" (
+  set /p proxy=Enter proxy host:port (e.g., 1.2.3.4:8080): 
+  netsh winhttp set proxy %proxy%
+) else (
+  netsh winhttp reset proxy
+)
+pause
+goto menu
+
+:eof
+exit
